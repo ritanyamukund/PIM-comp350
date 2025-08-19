@@ -1,0 +1,51 @@
+/* Results List Container */
+.results {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: .5rem;
+  }
+  
+  /* Result Card Row */
+  .result-card {
+    display: grid;
+    grid-template-columns: 72px 120px 1fr auto auto;
+    gap: .5rem;
+    align-items: center;
+    border: 1px solid #e5e7eb;
+    border-radius: .5rem;
+    padding: .5rem .75rem;
+    background: #fff;
+  }
+  
+  /* Metadata */
+  .id, .date {
+    color: #475569;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Title Link (toggle for preview) */
+  .title-link {
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    padding: .25rem;
+    color: #0f172a;
+  }
+  
+  /* Row Action Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .35rem .7rem;
+    border-radius: 999px;
+    font-size: .9rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+  .view { background: #22c55e; color: white; }
+  .edit { background: #10b981; color: white; }

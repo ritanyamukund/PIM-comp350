@@ -1,0 +1,51 @@
+/* Results container */
+.results {
+    display: grid;       /* Aligns rows in a consistent flow */
+    gap: .5rem;
+  }
+  
+  /* Card layout */
+  .result-card {
+    display: grid;
+    grid-template-columns: 72px 120px 1fr auto auto; /* Metadata | Metadata | Title | Actions */
+    align-items: center;
+    border: 1px solid #e5e7eb;
+    border-radius: .5rem;
+    padding: .5rem .75rem;
+  }
+  
+  /* Metadata */
+  .id, .date {
+    font-variant-numeric: tabular-nums;
+    color: #475569;
+  }
+  
+  /* Title as toggle */
+  .title-link {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+  }
+  
+  /* Actions */
+  .btn {
+    border-radius: 999px;
+    padding: .35rem .7rem;
+    font-size: .9rem;
+    font-weight: 600;
+  }
+  .view { background: #22c55e; color: white; }
+  .edit { background: #10b981; color: white; }
+  
+  /* Expandable preview */
+  .preview {
+    grid-column: 1 / -1;   /* Span full card width */
+    display: none;
+    margin-top: .5rem;
+    padding: .65rem .75rem;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: .5rem;
+  }
+  .result-card.expanded .preview { display: block; }
