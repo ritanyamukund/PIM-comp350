@@ -1,5 +1,6 @@
 import json
 
+
 users = {}
 
 def register_user(username: str, password: str) -> str:
@@ -28,4 +29,9 @@ def logout_user(username: str) -> str:
     Log out a user.
     Returns JSON: {"success": bool, "message": str}
     """
+ 
     return json.dumps({"success": True, "message": "Logout successful"})
+
+
+
+
