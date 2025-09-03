@@ -1,0 +1,311 @@
+import json
+import uuid
+from typing import Optional, List, Dict, Any
+from database import NoteDatabase
+import markdown
+
+class NoteDatabaseSystem:
+    def __init__(self, db_path: str = "notes.db"):
+        self.db = NoteDatabase(db_path)
+        self.active_sessions = {}  # session_id -> username
+    
+    def register_user(self, username: str, password: str) -> str:
+        """Register a new user"""
+        if self.db.create_user(username, password):
+            return json.dumps({"success": True, "message": "User registered successfully"})
+        else:
+            return json.dumps({"success": False, "message": "Username already exists"})
+    
+    def login_user(self, username: str, password: str) -> str:
+        """Login user and create session"""
+        if self.db.verify_user(username, password):
+            session_id = str(uuid.uuid4())
+            self.active_sessions[session_id] = username
+            return json.dumps({
+                "success": True,
+                "message": "Login successful",
+                "session_id": session_id
+            })
+        else:
+            return json.dumps({"success": False, "message": "Invalid username or password"})
+    
+    def logout_user(self, session_id: str) -> str:
+        """Logout user"""
+        if session_id in self.active_sessions:
+            del self.active_sessions[session_id]
+            return json.dumps({"success": True, "message": "Logout successful"})
+        return json.dumps({"success": False, "message": "Invalid session"})
+    
+    def _get_username_from_session(self, session_id: str) -> Optional[str]:
+        """Get username from session ID"""
+        return self.active_sessions.get(session_id)
+    
+    def _validate_session(self, session_id: str) -> Optional[int]:
+        """Validate session and return user_id"""
+        username = self._get_username_from_session(session_id)
+        if not username:
+            return None
+        return self.db.get_user_id(username)
+    
+    def create_note(self, session_id: str, title: str, content: str) -> str:
+        """Create a new note"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        note_id = self.db.create_note(user_id, title, content)
+        if note_id:
+            return json.dumps({
+                "success": True, 
+                "message": "Note created successfully",
+                "note_id": note_id
+            })
+        else:
+            return json.dumps({"success": False, "message": "Note title already exists"})
+    
+    def get_note(self, session_id: str, title: str) -> str:
+        """Get a specific note by title"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        note = self.db.get_note_by_title(user_id, title)
+        if note:
+            return json.dumps({"success": True, "note": note})
+        else:
+            return json.dumps({"success": False, "message": "Note not found"})
+    
+    def list_notes(self, session_id: str, limit: int = 50) -> str:
+        """List all notes for the user"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        notes = self.db.get_user_notes(user_id, limit)
+        
+        # Create preview for each note
+        for note in notes:
+            note["preview"] = note["content"][:100] + ("..." if len(note["content"]) > 100 else "")
+            # Remove full content from list view
+            del note["content"]
+        
+        return json.dumps({"success": True, "notes": notes, "count": len(notes)})
+    
+    def edit_note(self, session_id: str, title: str, new_content: str) -> str:
+        """Edit note content"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        if self.db.update_note_content(user_id, title, new_content):
+            return json.dumps({"success": True, "message": "Note updated successfully"})
+        else:
+            return json.dumps({"success": False, "message": "Note not found"})
+    
+      def render_markdown(self, content: str) -> str:
+        """
+        Render note content written in Markdown to HTML.
+        Returns JSON: {"success": bool, "html": str}
+        """
+        try:
+            html = markdown.markdown(content)
+            return json.dumps({"success": True, "html": html})
+        except Exception as e:
+            return json.dumps({"success": False, "html": "", "message": str(e)})
+        
+    def delete_note(self, session_id: str, title: str) -> str:
+        """Delete a note"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        if self.db.delete_note(user_id, title):
+            return json.dumps({"success": True, "message": "Note deleted successfully"})
+        else:
+            return json.dumps({"success": False, "message": "Note not found"})
+    
+    def search_notes(self, session_id: str, query: str) -> str:
+        """Search notes by keyword"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        results = self.db.search_user_notes(user_id, query)
+        
+        # Create preview for each result
+        for result in results:
+            result["preview"] = result["content"][:150] + ("..." if len(result["content"]) > 150 else "")
+            # Remove full content from search results
+            del result["content"]
+        
+        return json.dumps({"success": True, "results": results, "count": len(results)})
+    
+    def add_tags(self, session_id: str, title: str, tags: List[str]) -> str:
+        """Add tags to a note"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        all_tags = self.db.add_note_tags(user_id, title, tags)
+        if all_tags is not None:
+            return json.dumps({"success": True, "tags": all_tags})
+        else:
+            return json.dumps({"success": False, "message": "Note not found"})
+    
+    def get_stats(self, session_id: str) -> str:
+        """Get user statistics"""
+        user_id = self._validate_session(session_id)
+        if not user_id:
+            return json.dumps({"success": False, "message": "Not logged in"})
+        
+        stats = self.db.get_user_stats(user_id)
+        return json.dumps({"success": True, "stats": stats})
+
+
+def main():
+    """CLI interface for the database-powered note system"""
+    system = NoteDatabaseSystem()
+    current_session = None
+    
+    print("=== Note Taking System (Database Edition) ===")
+    
+    while True:
+        if not current_session:
+            print("\n1. Register")
+            print("2. Login")
+            print("3. Exit")
+            choice = input("Choose option: ")
+            
+            if choice == "1":
+                username = input("Username: ")
+                password = input("Password: ")
+                result = json.loads(system.register_user(username, password))
+                print(result["message"])
+            
+            elif choice == "2":
+                username = input("Username: ")
+                password = input("Password: ")
+                result = json.loads(system.login_user(username, password))
+                print(result["message"])
+                if result["success"]:
+                    current_session = result["session_id"]
+            
+            elif choice == "3":
+                break
+        
+        else:
+            print(f"\n=== Notes Menu ===")
+            print("1. Create Note")
+            print("2. List Notes")
+            print("3. View Note")
+            print("4. Edit Note")
+            print("5. Delete Note")
+            print("6. Search Notes")
+            print("7. Add Tags")
+            print("8. View Stats")
+            print("9. Logout")
+            
+            choice = input("Choose option: ")
+            
+            if choice == "1":
+                title = input("Note title: ")
+                print("Enter content (type 'END' on a new line to finish):")
+                content_lines = []
+                while True:
+                    line = input()
+                    if line == "END":
+                        break
+                    content_lines.append(line)
+                content = "\n".join(content_lines)
+                result = json.loads(system.create_note(current_session, title, content))
+                print(result["message"])
+            
+            elif choice == "2":
+                result = json.loads(system.list_notes(current_session))
+                if result["success"]:
+                    print(f"\n=== Your Notes ({result['count']}) ===")
+                    for note in result["notes"]:
+                        tags_str = ", ".join(note["tags"]) if note["tags"] else "No tags"
+                        print(f"• {note['title']} (Modified: {note['modified_at']})")
+                        print(f"  Tags: {tags_str}")
+                        print(f"  {note['preview']}\n")
+                else:
+                    print(result["message"])
+            
+            elif choice == "3":
+                title = input("Note title to view: ")
+                result = json.loads(system.get_note(current_session, title))
+                if result["success"]:
+                    note = result["note"]
+                    print(f"\n=== {note['title']} ===")
+                    print(f"Created: {note['created_at']}")
+                    print(f"Modified: {note['modified_at']}")
+                    if note["tags"]:
+                        print(f"Tags: {', '.join(note['tags'])}")
+                    print(f"\n{note['content']}\n")
+                else:
+                    print(result["message"])
+            
+            elif choice == "4":
+                title = input("Note title to edit: ")
+                print("Enter new content (type 'END' on a new line to finish):")
+                content_lines = []
+                while True:
+                    line = input()
+                    if line == "END":
+                        break
+                    content_lines.append(line)
+                new_content = "\n".join(content_lines)
+                result = json.loads(system.edit_note(current_session, title, new_content))
+                print(result["message"])
+            
+            elif choice == "5":
+                title = input("Note title to delete: ")
+                confirm = input(f"Are you sure you want to delete '{title}'? (y/N): ")
+                if confirm.lower() == 'y':
+                    result = json.loads(system.delete_note(current_session, title))
+                    print(result["message"])
+                else:
+                    print("Deletion cancelled")
+            
+            elif choice == "6":
+                query = input("Search query: ")
+                result = json.loads(system.search_notes(current_session, query))
+                if result["success"] and result["results"]:
+                    print(f"\n=== Search Results ({result['count']}) ===")
+                    for note in result["results"]:
+                        print(f"• {note['title']} (Modified: {note['modified_at']})")
+                        print(f"  {note['preview']}\n")
+                else:
+                    print("No results found")
+            
+            elif choice == "7":
+                title = input("Note title to add tags to: ")
+                tags_input = input("Tags (comma-separated): ")
+                tags = [tag.strip() for tag in tags_input.split(",") if tag.strip()]
+                result = json.loads(system.add_tags(current_session, title, tags))
+                if result["success"]:
+                    print(f"All tags: {', '.join(result['tags'])}")
+                else:
+                    print(result["message"])
+            
+            elif choice == "8":
+                result = json.loads(system.get_stats(current_session))
+                if result["success"]:
+                    stats = result["stats"]
+                    print(f"\n=== Your Statistics ===")
+                    print(f"Total Notes: {stats['total_notes']}")
+                    print(f"Unique Tags: {stats['total_tags']}")
+                    if stats["recent_note"]["title"]:
+                        print(f"Most Recent: {stats['recent_note']['title']}")
+                        print(f"Last Modified: {stats['recent_note']['modified_at']}")
+                else:
+                    print(result["message"])
+            
+            elif choice == "9":
+                system.logout_user(current_session)
+                current_session = None
+                print("Logged out successfully")
+
+if __name__ == "__main__":
+    main()
