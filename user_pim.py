@@ -1,0 +1,119 @@
+
+
+import json
+from datetime import date
+import markdown 
+
+user_notes = {}
+
+def create_note(username: str, title: str, content: str) -> str:
+    """
+    Create a new note for a user.
+    Returns JSON: {"success": bool, "message": str}
+    """
+    if username not in user_notes:
+        user_notes[username] = []
+    for note in user_notes[username]:
+        if note["title"] == title:
+            return json.dumps({"success": False, "message": "Note title already exists"})
+    user_notes[username].append({
+        "id": len(user_notes[username]) + 1,
+        "date": str(date.today()),
+        "title": title,
+        "content": content
+    })
+    return json.dumps({"success": True, "message": "Note created"})
+
+
+def get_note(username: str, title: str) -> str:
+    """
+    Retrieve a note by title for a user.
+    Returns JSON: {"success": bool, "note": dict or None}
+    """
+    for note in user_notes.get(username, []):
+        if note["title"] == title:
+            return json.dumps({"success": True, "note": note})
+    return json.dumps({"success": False, "note": None})
+
+def in_place_viewer(username: str, title: str) -> str:
+    """
+    In-place viewer: show a short preview of the note content.
+    Returns JSON: {"success": bool, "title": str, "preview": str, "date": str}
+    """
+    for note in user_notes.get(username, []):
+        if note["title"] == title:
+            preview = note["content"][:120] + ("…" if len(note["content"]) > 120 else "")
+            return json.dumps({
+                "success": True,
+                "title": note["title"],
+                "preview": preview,
+                "date": note["date"]
+            })
+    return json.dumps({"success": False, "message": "Note not found"})
+
+
+def particle_viewer(username: str, title: str) -> str:
+    """
+    Full viewer: show the complete note.
+    Returns JSON: {"success": bool, "title": str, "content": str, "date": str}
+    """
+    for note in user_notes.get(username, []):
+        if note["title"] == title:
+            return json.dumps({
+                "success": True,
+                "title": note["title"],
+                "content": note["content"],
+                "date": note["date"]
+            })
+    return json.dumps({"success": False, "message": "Note not found"})
+
+
+
+def render_markdown(content: str) -> str:
+    """
+    Render note content written in Markdown to HTML.
+    Returns JSON: {"success": bool, "html": str}
+    """
+    try:
+        html = markdown.markdown(content)
+        return json.dumps({"success": True, "html": html})
+    except Exception as e:
+        return json.dumps({"success": False, "html": "", "message": str(e)})
+
+def edit_note(username: str, title: str, new_content: str) -> str:
+    """
+    Edit the content of a note for a user.
+    Returns JSON: {"success": bool, "message": str}
+    """
+    for note in user_notes.get(username, []):
+        if note["title"] == title:
+            note["content"] = new_content
+            return json.dumps({"success": True, "message": "Note updated"})
+    return json.dumps({"success": False, "message": "Note not found"})
+
+
+def delete_note(username: str, title: str) -> str:
+    """
+    Delete a note by title for a user.
+    Returns JSON: {"success": bool, "message": str}
+    """
+    notes = user_notes.get(username, [])
+    for i, note in enumerate(notes):
+        if note["title"] == title:
+            del notes[i]
+            return json.dumps({"success": True, "message": "Note deleted"})
+    return json.dumps({"success": False, "message": "Note not found"})
+
+
+
+def search_notes(username: str, query: str) -> str:
+    """
+    Search notes by keyword in title or content for a user.
+    Returns JSON: {"success": bool, "results": list[dict]}
+    Each result: {"id": int, "date": str, "title": str}
+    """
+    results = []
+    for note in user_notes.get(username, []):
+        if query.lower() in note["title"].lower() or query.lower() in note["content"].lower():
+            results.append(note)
+    return json.dumps({"success": True, "results": results})
